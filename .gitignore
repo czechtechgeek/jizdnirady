@@ -1,0 +1,15 @@
+# Data — stahují se / generují lokálně
+gtfs.zip
+gtfs.zip.part
+*.db
+!user.db.schema.sql
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Ostatní
+.DS_Store
+*.log

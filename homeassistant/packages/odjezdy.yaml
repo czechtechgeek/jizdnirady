@@ -1,0 +1,106 @@
+# Jablonecké spojení — Home Assistant package
+#
+# Instalace:
+#   1. zkopíruj tento soubor do /config/packages/odjezdy.yaml
+#   2. v configuration.yaml musí být:
+#        homeassistant:
+#          packages: !include_dir_named packages
+#   3. do secrets.yaml přidej:
+#        jizdnirady_url: "http://192.168.88.37:8099"
+#   4. restart HA (Developer tools → YAML → Restart)
+#
+# Vzniknou senzory:
+#   sensor.spojeni_do_prace        stav: "05:37 → 05:55", atributy: items, tomorrow
+#   sensor.spojeni_z_prace         stav: "14:19 → 14:33"
+#   sensor.spojeni_rano_plan       stav: "05:37 → 05:55"  (typický pracovní den)
+#   sensor.spojeni_odpoledne_plan  stav: "14:19 → 14:33"
+#   sensor.spojeni_dalsi_odjezd    stav: počet minut do odjezdu
+#   sensor.spojeni_stav            stav: text pro dashboard
+
+rest:
+  - resource: !secret jizdnirady_url
+    scan_interval: 60
+    sensor:
+      - name: "Spojení do práce"
+        unique_id: jizdnirady_to_work
+        value_template: >-
+          {% set i = value_json.to_work.items | default([]) %}
+          {% if i %}{{ i[0].dep }} → {{ i[0].arr }}{% else %}nic{% endif %}
+        json_attributes_path: "$.to_work"
+        json_attributes:
+          - items
+          - tomorrow
+          - from
+          - to
+
+      - name: "Spojení z práce"
+        unique_id: jizdnirady_from_work
+        value_template: >-
+          {% set i = value_json.from_work.items | default([]) %}
+          {% if i %}{{ i[0].dep }} → {{ i[0].arr }}{% else %}nic{% endif %}
+        json_attributes_path: "$.from_work"
+        json_attributes:
+          - items
+          - tomorrow
+
+      - name: "Spojení ráno plán"
+        unique_id: jizdnirady_plan_morning
+        value_template: >-
+          {% set i = value_json.plan.morning | default([]) %}
+          {% if i %}{{ i[-1].dep }} → {{ i[-1].arr }}{% else %}nic{% endif %}
+        json_attributes_path: "$.plan"
+        json_attributes:
+          - morning
+          - afternoon
+          - date
+
+      - name: "Spojení odpoledne plán"
+        unique_id: jizdnirady_plan_afternoon
+        value_template: >-
+          {% set i = value_json.plan.afternoon | default([]) %}
+          {% if i %}{{ i[-1].dep }} → {{ i[-1].arr }}{% else %}nic{% endif %}
+
+template:
+  - sensor:
+      - name: "Spojení další odjezd"
+        unique_id: jizdnirady_next_min
+        unit_of_measurement: "min"
+        state: >-
+          {% set i = state_attr('sensor.spojeni_do_prace', 'items') | default([]) %}
+          {% if i and i[0].in_min is not none %}{{ i[0].in_min }}{% else %}0{% endif %}
+
+      - name: "Spojení stav"
+        unique_id: jizdnirady_state_text
+        state: >-
+          {% set i = state_attr('sensor.spojeni_do_prace', 'items') | default([]) %}
+          {% if not i %}nic nejede
+          {% elif state_attr('sensor.spojeni_do_prace', 'tomorrow') %}zítra {{ i[0].dep }} ({{ i[0].line }})
+          {% else %}{{ i[0].dep }} za {{ i[0].in_min }} min ({{ i[0].line }}), příjezd {{ i[0].arr }}{% endif %}
+
+      - name: "Spojení do práce linka"
+        unique_id: jizdnirady_line
+        state: >-
+          {% set i = state_attr('sensor.spojeni_do_prace', 'items') | default([]) %}
+          {{ i[0].line if i else '-' }}
+
+automation:
+  - alias: "Spojení: připomenutí odjezdu do práce"
+    id: jizdnirady_reminder
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.spojeni_dalsi_odjezd
+        below: 15
+        above: 1
+    condition:
+      - condition: time
+        after: "04:00:00"
+        before: "09:00:00"
+      - condition: state
+        entity_id: sensor.spojeni_do_prace
+        state_not: "nic"
+    action:
+      - service: notify.notify
+        data:
+          title: "Za chvíli ti jede spoj"
+          message: "{{ states('sensor.spojeni_stav') }}"
+    mode: single

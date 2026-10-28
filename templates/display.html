@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Odjezdy</title>
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+<link rel="icon" href="/static/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Odjezdy">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #fff; color: #111;
+    font-family: "DejaVu Sans", Arial, sans-serif; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 12px 20px 0; }
+  .mode { font-size: 22px; font-weight: 700; padding: 8px 18px; border: 3px solid #111;
+          border-radius: 10px; background: #fff; cursor: pointer; }
+  .mode.on { background: #111; color: #fff; }
+  .mode.small { font-size: 15px; font-weight: 600; padding: 6px 10px; border-width: 2px; }
+  .now { margin-left: auto; font-size: 22px; color: #555; font-variant-numeric: tabular-nums; }
+  .wrap { display: flex; gap: 20px; padding: 14px 20px 10px; }
+  .col { flex: 1; border: 3px solid #111; border-radius: 14px; padding: 14px 18px; min-height: 0; }
+  .title { font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+           border-bottom: 3px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+  .sub { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+         color: #555; margin: 12px 0 2px; }
+  .row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #ccc; cursor: pointer; }
+  .row:hover { background: #f2f2f2; }
+  .row.small .t { font-size: 40px; min-width: 130px; }
+  .row.small .in, .row.small .line { font-size: 20px; }
+  .row.small .line { min-width: 60px; padding: 3px 9px; }
+  .row.small .arr { font-size: 18px; }
+  .t { font-size: 54px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; min-width: 165px; }
+  .in { font-size: 22px; font-weight: 600; }
+  .line { font-size: 23px; font-weight: 700; background: #111; color: #fff;
+          border-radius: 8px; padding: 4px 11px; min-width: 70px; text-align: center; }
+  .arr { margin-left: auto; font-size: 20px; color: #444; white-space: nowrap; }
+  .tag { font-size: 15px; font-weight: 700; background: #111; color: #fff; border-radius: 6px; padding: 2px 7px; }
+  .row.target { background: #fff7ed; }
+  .empty { font-size: 22px; color: #666; margin-top: 14px; }
+  .hint { font-size: 15px; color: #999; }
+  .detail { padding: 6px 0 12px 6px; border-bottom: 1px dashed #ccc; font-size: 18px; }
+  .detail .stop { display: flex; gap: 12px; padding: 2px 0; }
+  .detail .tm { min-width: 62px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .detail .mid { color: #444; }
+  .detail .first, .detail .last { font-weight: 700; }
+  .detail .head { color: #666; font-size: 15px; margin-bottom: 4px; }
+  .foot { text-align: center; font-size: 14px; color: #666; padding: 2px 0 10px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <button class="mode on" id="m-now" onclick="setMode('now')">TEĎ</button>
+  <button class="mode" id="m-plan" onclick="setMode('plan')">PLÁN</button>
+  <button class="mode small" id="fs" onclick="toggleFs()">celá obrazovka</button>
+  <div class="now" id="now"></div>
+</div>
+
+<div class="wrap" id="view-now">
+  <div class="col">
+    <div class="title">Do práce</div>
+    <div id="c1"></div>
+    <div class="sub" id="altTitle" style="display:none">nebo z autobusového nádraží</div>
+    <div id="c1b"></div>
+  </div>
+  <div class="col">
+    <div class="title" id="t2">Z práce</div>
+    <div id="c2"></div>
+  </div>
+</div>
+
+<div class="wrap" id="view-plan" style="display:none">
+  <div class="col">
+    <div class="title" id="t3">Ráno do práce</div>
+    <div id="p1"></div>
+  </div>
+  <div class="col">
+    <div class="title" id="t4">Odpoledne z práce</div>
+    <div id="p2"></div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+<script>
+let MODE = 'now', LAST = null;
+
+function setMode(m){
+  MODE = m;
+  document.getElementById('view-now').style.display = m === 'now' ? 'flex' : 'none';
+  document.getElementById('view-plan').style.display = m === 'plan' ? 'flex' : 'none';
+  document.getElementById('m-now').classList.toggle('on', m === 'now');
+  document.getElementById('m-plan').classList.toggle('on', m === 'plan');
+  if (LAST) draw(LAST);
+}
+if (location.hash === '#plan') setMode('plan');
+
+async function tick(){
+  if (document.querySelector('.detail')) return;   // nemažeme otevřený detail
+  try {
+    LAST = await (await fetch('/api/display')).json();
+    draw(LAST);
+  } catch(e) { document.getElementById('foot').textContent = 'spojení se serverem selhalo'; }
+}
+
+function row(i, small, showTag){
+  const inMin = (i.in_min === undefined || i.in_min === null) ? '' : `<div class="in">za ${i.in_min} min</div>`;
+  const tag = (showTag && i.target) ? '<span class="tag">na 6</span>' : '';
+  return `
+    <div class="row ${small ? 'small' : ''} ${i.target ? 'target' : ''}"
+         data-trip="${i.trip}" data-s1="${i.s1}" data-s2="${i.s2}"
+         data-headsign="${(i.headsign || '').replace(/"/g, '&quot;')}">
+      <div class="t">${i.dep}</div>
+      ${inMin}
+      <div class="line">${i.line}</div>
+      <div class="arr">${tag} ${i.arr} <span class="hint">▸</span></div>
+    </div>`;
+}
+
+function fill(id, items, small, showTag, emptyText){
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!items || !items.length){ el.innerHTML = `<div class="empty">${emptyText || 'nic nejede'}</div>`; return; }
+  el.innerHTML = items.map(i => row(i, small, showTag)).join('');
+  el.querySelectorAll('.row').forEach(r => r.onclick = () => toggleDetail(r));
+}
+
+function draw(d){
+  document.getElementById('now').textContent = d.now;
+  document.getElementById('foot').textContent = 'aktualizováno ' + d.now + ' · klikni na spoj pro zastávky';
+
+  if (MODE === 'now'){
+    document.getElementById('c1').innerHTML = '';
+    document.querySelector('#view-now .col .title').textContent =
+      'Do práce' + (d.to_work.tomorrow ? ' · zítra' : '');
+    fill('c1', d.to_work.items, false, true, d.to_work.tomorrow ? 'zítra nic' : 'dnes už nic');
+    const alt = d.to_work_alt;
+    document.getElementById('altTitle').style.display = alt ? 'block' : 'none';
+    if (alt) fill('c1b', alt.items, true, false, 'nic');
+    document.getElementById('t2').textContent = 'Z práce' + (d.leave_before ? ' · do ' + d.leave_before : '') +
+      (d.from_work.tomorrow ? ' · zítra' : '');
+    fill('c2', d.from_work.items, false, false, 'dnes už nic');
+  } else {
+    const p = d.plan || {morning: [], afternoon: []};
+    document.getElementById('t3').textContent = 'Ráno do práce' + (d.arrive_by ? ' · na ' + d.arrive_by : '');
+    document.getElementById('t4').textContent = 'Odpoledne z práce' + (d.leave_before ? ' · před ' + d.leave_before : '');
+    fill('p1', p.morning, false, true, 'žádný spoj');
+    fill('p2', p.afternoon, false, false, 'žádný spoj');
+  }
+}
+
+async function toggleDetail(row){
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains('detail')) { next.remove(); return; }
+  document.querySelectorAll('.detail').forEach(d => d.remove());
+  const box = document.createElement('div');
+  box.className = 'detail';
+  box.textContent = 'načítám…';
+  row.after(box);
+  try {
+    const url = `/api/trip?trip=${encodeURIComponent(row.dataset.trip)}&s1=${row.dataset.s1}&s2=${row.dataset.s2}`;
+    const stops = await (await fetch(url)).json();
+    const head = row.dataset.headsign ? `<div class="head">směr ${row.dataset.headsign}</div>` : '';
+    box.innerHTML = head + stops.map((s, i) => `
+      <div class="stop ${i === 0 ? 'first' : (i === stops.length - 1 ? 'last' : 'mid')}">
+        <span class="tm">${s.dep}</span><span>${s.name}</span>
+      </div>`).join('');
+  } catch(e) { box.textContent = 'detail se nepodařilo načíst'; }
+}
+
+// PWA + kiosk: offline shell, obrazovka nezhasíná, celá obrazovka na klik
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+let wakeLock = null;
+async function keepAwake() {
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* prohlížeč to neumí */ }
+}
+keepAwake();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+function toggleFs() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+tick();
+setInterval(tick, 30000);
+</script>
+</body>
+</html>

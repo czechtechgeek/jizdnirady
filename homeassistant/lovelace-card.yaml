@@ -1,0 +1,27 @@
+# Karta na dashboard (Markdown) — vlož v editoru karty:
+#   type: markdown
+#   content: |-
+#     ... (zkopíruj obsah níže)
+#
+# Předpokládá senzory z packages/odjezdy.yaml.
+
+type: markdown
+title: Odjezdy
+content: |-
+  {% set items = state_attr('sensor.spojeni_do_prace', 'items') or [] %}
+  {% set fw = state_attr('sensor.spojeni_z_prace', 'items') or [] %}
+  **Do práce**{% if state_attr('sensor.spojeni_do_prace', 'tomorrow') %} (zítra){% endif %}
+
+  {% for i in items[:4] -%}
+  **{{ i.dep }}** · linka {{ i.line }} · příjezd {{ i.arr }}
+  {% if i.in_min is not none %} · za {{ i.in_min }} min{% endif %}
+  {% if i.target %} · ⭐ na 6{% endif %}
+
+  {% endfor %}
+  **Z práce** (před 15:00)
+
+  {% for i in fw[:4] -%}
+  **{{ i.dep }}** · linka {{ i.line }} · příjezd {{ i.arr }}
+  {% if i.in_min is not none %} · za {{ i.in_min }} min{% endif %}
+
+  {% endfor %}

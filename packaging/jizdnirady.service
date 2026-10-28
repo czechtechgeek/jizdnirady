@@ -1,0 +1,16 @@
+[Unit]
+Description=Jablonecke spojeni - odjezdy a displej
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/jizdnirady
+ExecStart=/usr/bin/python3 app.py
+Environment=PYTHONUNBUFFERED=1
+Environment=PORT=8099
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
