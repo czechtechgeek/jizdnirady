@@ -1,0 +1,22 @@
+{
+  "name": "Jablonecké spojení",
+  "short_name": "Spojení",
+  "description": "Odjezdy z jabloneckých zastávek — spoje, přestupy a displej na stůl.",
+  "lang": "cs",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Displej odjezdů", "short_name": "Displej", "url": "/display", "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Hledat spojení", "short_name": "Hledat", "url": "/" }
+  ]
+}

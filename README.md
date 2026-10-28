@@ -4,6 +4,18 @@ Odjezdy z jabloneckých zastávek nad daty GTFS — hledání spojení, oblíben
 
 ![Displej](docs/display.png)
 
+## Instalace do Home Assistant
+
+Repozitář je zároveň **add-on repository**:
+
+1. HA → Nastavení → Doplňky → Obchod s doplňky → **⋮ → Repozitáře**
+2. Přidat `https://github.com/czechtechgeek/jizdnirady`
+3. Nainstalovat **Jablonecké spojení** a spustit
+
+Po startu je aplikace v postranním panelu **Odjezdy** (ingress) a zároveň na `http://homeassistant.local:8099` (PWA, displej, senzory). První start stahuje GTFS a staví databázi — několik minut. Podrobnosti v [`addon/README.md`](addon/README.md).
+
+Pro senzory v HA (bez add-onu) použij [`homeassistant/`](homeassistant/README.md).
+
 ## Co to umí
 
 - **Hledání spojení** mezi dvěma zastávkami s našeptávačem (všechny zastávky IDOL, Liberecký kraj a navazující linky).

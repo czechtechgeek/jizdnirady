@@ -7,13 +7,48 @@ from flask import Flask, jsonify, make_response, render_template, request, send_
 import transfers as tr_mod
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE, 'jizdnirady.db')
-USER = os.path.join(BASE, 'user.db')
+# Cesty lze přepsat env proměnnými (Home Assistant add-on je drží v /data)
+DB = os.environ.get('JIZDNIRADY_DB') or os.path.join(BASE, 'jizdnirady.db')
+USER = os.environ.get('JIZDNIRADY_USER_DB') or os.path.join(BASE, 'user.db')
+INGRESS_BASE = os.environ.get('INGRESS_BASE', '').rstrip('/')
 TZ = ZoneInfo('Europe/Prague')
 
 app = Flask(__name__)
 
 _ALT_CACHE = {}
+
+
+@app.after_request
+def fix_ingress_paths(response):
+    """Home Assistant ingress servíruje aplikaci pod /api/hassio_ingress/<slug>/.
+    Absolutní cesty v HTML i v JS je potřeba přepsat, jinak se nenačtou data."""
+    pfx = (request.headers.get('X-Ingress-Path')
+           or request.headers.get('X-Forwarded-Prefix')
+           or INGRESS_BASE).rstrip('/')
+    if not pfx:
+        return response
+
+    loc = response.headers.get('Location', '')
+    if loc.startswith('/') and not loc.startswith(pfx + '/'):
+        response.headers['Location'] = pfx + loc
+
+    ctype = response.content_type or ''
+    if 'text/html' not in ctype and 'javascript' not in ctype:
+        return response
+
+    body = response.get_data(as_text=True)
+    # Prefix vkládáme přes zástupný znak — ingress cesta sama začíná "/api/",
+    # takže přímé vkládání by se aplikovalo dvakrát.
+    S = '\x00'
+    for attr in ('href="/', 'src="/', 'action="/'):
+        body = body.replace(attr, attr[:-1] + S + '/')
+    for quote, path in (("'", '/api/'), ('"', '/api/'), ('`', '/api/'),
+                        ("'", '/static/'), ('"', '/static/'), ('`', '/static/'),
+                        ("'", '/sw.js'), ('"', '/sw.js'),
+                        ("'", '/manifest.webmanifest'), ('"', '/manifest.webmanifest')):
+        body = body.replace(quote + path, quote + S + path)
+    response.set_data(body.replace(S, pfx))
+    return response
 
 TYPE = {0: 'tram', 1: 'metro', 2: 'vlak', 3: 'bus', 4: 'loď', 5: 'lanovka', 6: 'lanovka',
         7: 'funicular', 11: 'bus', 12: 'vlak'}
@@ -248,7 +283,7 @@ def insights():
     return jsonify(out)
 
 
-COMMUTE = os.path.join(BASE, 'commute.json')
+COMMUTE = os.environ.get('JIZDNIRADY_COMMUTE') or os.path.join(BASE, 'commute.json')
 
 
 def load_commute():
