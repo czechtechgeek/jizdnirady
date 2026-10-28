@@ -75,6 +75,24 @@ Příklad:
 curl 'http://localhost:8099/api/next?from=Jablonec%20nad%20Nisou,%20Brandl&to=Liberec,%20F%C3%BCgnerova'
 ```
 
+## Instalace jako aplikace (PWA)
+
+Na počítači i telefonu jde web nainstalovat na plochu a spustit bez adresního řádku:
+
+- **Chrome / Edge (PC):** adresní řádek → ikona „Instalovat“ (nebo menu ⋮ → *Uložit a sdílet → Nainstalovat*).
+- **Android:** menu ⋮ → *Přidat na plochu*.
+- **iPhone/iPad:** Sdílet → *Přidat na plochu*.
+
+**Pozor na HTTP:** service worker (a tedy instalace) funguje jen v „secure context“ — HTTPS nebo `localhost`.
+Přes holé `http://192.168.x.x` prohlížeč manifest načte, ale instalaci nenabídne. Možnosti:
+
+1. **Chrome flag (nejrychlejší, jen pro ten počítač):**
+   `chrome://flags/#unsafely-treat-insecure-origin-as-secure` → přidat `http://192.168.88.37:8099` → Enabled → restart Chromu.
+2. **HTTPS certifikát** (mkcert) a spuštění aplikace s `--cert/--key` — instalace pak funguje na všech zařízeních, kde je certifikát důvěryhodný.
+3. **Cloudflare Tunnel** na vlastní subdoménu (např. `spojeni.czechtechgeek.cz`) — HTTPS a dostupnost i mimo domácí síť.
+
+Výhody PWA: offline shell (poslední stránka se zobrazí i bez sítě), vlastní ikona, celoobrazovkový režim, a na displeji navíc **Wake Lock** — obrazovka nezhasíná.
+
 ## Home Assistant
 
 Viz [`homeassistant/README.md`](homeassistant/README.md) — balíček vytvoří senzory `sensor.spojeni_do_prace`, `sensor.spojeni_z_prace`, `sensor.spojeni_dalsi_odjezd` a automatizaci na připomenutí odjezdu. Displej lze vložit i jako `panel_iframe`.
