@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — 2026-10-28
+
+### Opraveno
+- Navigace mezi hledáním a displejem: v aplikaci je odkaz **„Displej odjezdů →“**, na displeji **„hledat“** (v HA ingressu se cesty přepisují správně).
+
 ## 1.0.0 — 2026-10-28
 
 První veřejné vydání.

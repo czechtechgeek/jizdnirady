@@ -1,5 +1,5 @@
 name: "Jablonecké spojení"
-version: "1.0.0"
+version: "1.0.1"
 slug: "jizdnirady"
 description: "Odjezdy z jabloneckých zastávek (GTFS), přestupy a displej na stůl"
 url: "https://github.com/czechtechgeek/jizdnirady"

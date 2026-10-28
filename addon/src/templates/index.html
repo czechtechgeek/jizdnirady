@@ -16,6 +16,9 @@
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--txt); }
   header { padding:18px 16px 10px; max-width:640px; margin:0 auto; }
+  .nav { display:inline-block; margin-top:10px; color:var(--accent); text-decoration:none;
+         font-size:14px; font-weight:600; border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+  .nav:hover { border-color:var(--accent); }
   h1 { font-size:20px; margin:0 0 2px; }
   .sub { color:var(--muted); font-size:13px; }
   main { max-width:640px; margin:0 auto; padding:0 16px 40px; }
@@ -70,6 +73,7 @@
   <span class="clock" id="clock"></span>
   <h1>🚌 Jablonecké spojení</h1>
   <div class="sub">Nejbližší odjezdy mezi dvěma zastávkami · IDOL / GTFS</div>
+  <a class="nav" href="/display">Displej odjezdů →</a>
 </header>
 <main>
   <div class="card">

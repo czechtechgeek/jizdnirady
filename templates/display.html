@@ -20,6 +20,7 @@
           border-radius: 10px; background: #fff; cursor: pointer; }
   .mode.on { background: #111; color: #fff; }
   .mode.small { font-size: 15px; font-weight: 600; padding: 6px 10px; border-width: 2px; }
+  a.mode { text-decoration: none; color: #111; display: inline-block; }
   .now { margin-left: auto; font-size: 22px; color: #555; font-variant-numeric: tabular-nums; }
   .wrap { display: flex; gap: 20px; padding: 14px 20px 10px; }
   .col { flex: 1; border: 3px solid #111; border-radius: 14px; padding: 14px 18px; min-height: 0; }
@@ -56,6 +57,7 @@
   <button class="mode on" id="m-now" onclick="setMode('now')">TEĎ</button>
   <button class="mode" id="m-plan" onclick="setMode('plan')">PLÁN</button>
   <button class="mode small" id="fs" onclick="toggleFs()">celá obrazovka</button>
+  <a class="mode small" id="back" href="/">hledat</a>
   <div class="now" id="now"></div>
 </div>
 
