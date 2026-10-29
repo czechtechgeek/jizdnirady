@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — 2026-10-29
+
+### Přidáno
+- **Týdenní fond** v `commute.json` (`work_hours`): 42,5 h týdně, 30 min neplacený oběd, příjezd 6:10, páteční odjezd 11:45.
+- Displej vyznačí zelenou značkou **„týden“** spoje z práce, které už dají dohromady týdenní fond; potřebný odjezd je i v patičce (Po–Čt 15:54).
+- Pokud v nabídce žádný takový spoj není, přidá se první následující.
+- V pátek se nabídka z práce omezí na odjezdy do 11:45 (kroužek) a značky se nezobrazují.
+
 ## 1.1.0 — 2026-10-29
 
 ### Přidáno

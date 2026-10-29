@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Jablonecké spojení — nejbližší odjezdy mezi dvěma zastávkami (GTFS) + oblíbené."""
-import datetime, json, os, sqlite3
+import datetime, json, math, os, sqlite3
 from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, make_response, render_template, request, send_from_directory
 
@@ -124,8 +124,8 @@ def active_services(con, d=None):
 
 
 def hm(t):
-    h, m, _ = t.split(':')
-    return int(h) * 60 + int(m)
+    parts = str(t).split(':')
+    return int(parts[0]) * 60 + int(parts[1])
 
 
 @app.route('/')
@@ -464,6 +464,31 @@ def _plan(day, home, work, arrive_by, leave_before, leave_after=None):
     return {'morning': morning, 'afternoon': afternoon, 'date': day.isoformat()}
 
 
+def _week_need(cfg):
+    """Kolik musí být v práci, aby za týden napracoval cílový počet hodin."""
+    wh = cfg.get('work_hours') or {}
+    target = float(wh.get('weekly') or 42.5) * 60      # minuty týdně (bez oběda)
+    lunch = int(wh.get('lunch_min') or 30)            # neplacený oběd
+    arrive = wh.get('arrive_work') or '06:10'
+    friday_leave = wh.get('friday_leave') or '11:45'
+    days = wh.get('days') or [1, 2, 3, 4]
+    a, f = hm(arrive), hm(friday_leave)
+    friday = max(0, f - a)                            # páteční práce bez oběda
+    per_day = (target - friday) / len(days)           # čistá práce Po–Čt
+    dep = a + per_day + lunch                         # + oběd, protože není v pracovní době
+    dep = math.ceil(dep)
+    return {
+        'weekly': target / 60,
+        'friday_min': friday,
+        'daily_work_min': round(per_day),
+        'dep': f'{dep // 60:02d}:{dep % 60:02d}',
+        'arrive': arrive,
+        'friday_leave': friday_leave,
+        'lunch': lunch,
+        'days': days,
+    }
+
+
 def _via(a, via, b, cur, limit=4, day=None):
     """Spojení přes zadanou zastávku (např. z práce přes autobusové nádraží)."""
     con = db()
@@ -563,17 +588,29 @@ def api_display():
         for i in to_work['items']:
             i['target'] = (i is best)
 
-    # z práce: 3 spoje před 15:00 + 3 po 15:00
-    pre = _direct(work, home, cur, limit=3, max_dep=leave_before, min_dep=leave_after)
-    post = _direct(work, home, cur, limit=3, min_dep=leave_before)
+    # týdenní fond: potřebný odjezd, aby dal 42,5 h (oběd není v pracovní době)
+    week = _week_need(cfg)
+    need_dep = hm(week['dep'])
+    friday = t.weekday() == 4
+
+    # z práce: 3 spoje před 15:00 + 3 po 15:00; v pátek do odjezdu na kroužek
+    fw_max, fw_min = (week['friday_leave'], None) if friday else (leave_before, leave_after)
+    pre = _direct(work, home, cur, limit=6 if friday else 3, max_dep=fw_max, min_dep=fw_min)
+    post = [] if friday else _direct(work, home, cur, limit=3, min_dep=fw_max)
     post_tomorrow = False
-    if not post and not pre:
-        post = _direct(work, home, 0, limit=3, day=tomorrow, min_dep=leave_before)
+    if not post and not pre and not friday:
+        post = _direct(work, home, 0, limit=3, day=tomorrow, min_dep=fw_max)
         for i in post:
             i['in_min'] = None
         post_tomorrow = bool(post)
     for i in post:
         i['late'] = True
+    if t.weekday() != 4 and not any(hm(i['dep']) >= need_dep for i in post):
+        # přidej první spoj, který už fond splní, i kdyby byl mimo okno
+        for i in _direct(work, home, need_dep, limit=1):
+            i['late'] = True
+            i['in_min'] = hm(i['dep']) - cur
+            post.append(i)
 
     # alternativa: 4 spoje přes autobusové nádraží
     via_items = _via(work, alt, home, cur, limit=4) if alt else []
@@ -584,9 +621,20 @@ def api_display():
             i['in_min'] = None
         via_tomorrow = bool(via_items)
 
+    # týdenní fond: které odjezdy z práce už dají dohromady 42,5 h
+    fw_items = pre + post
+    if t.weekday() == 4:                      # pátek — do kroužku
+        week['mode'] = 'friday'
+    else:
+        need = hm(week['dep'])
+        week['mode'] = 'weekday'
+        for i in fw_items + via_items:
+            i['week_ok'] = hm(i['dep']) >= need
+
     workday = _typical_workday(t.date())
 
     return jsonify({
+        'week': week,
         'now': t.strftime('%H:%M'),
         'at': at or None,
         'home': cfg.get('home_label', 'Doma'),
@@ -596,7 +644,7 @@ def api_display():
         'plan': _plan(workday, home, work, arrive_by, leave_before, leave_after),
         'to_work': to_work,
         'to_work_alt': _direction(alt, work, cur, tomorrow, limit=4, force_tomorrow=evening) if alt else None,
-        'from_work': {'from': work, 'to': home, 'items': pre + post,
+        'from_work': {'from': work, 'to': home, 'items': fw_items,
                       'tomorrow': post_tomorrow, 'split': len(pre)},
         'from_work_via': {'via': alt, 'items': via_items, 'tomorrow': via_tomorrow} if alt else None,
     })

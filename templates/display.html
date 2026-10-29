@@ -40,7 +40,8 @@
   .line { font-size: 23px; font-weight: 700; background: #111; color: #fff;
           border-radius: 8px; padding: 4px 11px; min-width: 70px; text-align: center; }
   .arr { margin-left: auto; font-size: 20px; color: #444; white-space: nowrap; }
-  .tag { font-size: 15px; font-weight: 700; background: #111; color: #fff; border-radius: 6px; padding: 2px 7px; }
+  .tag { font-size: 15px; font-weight: 700; background: #111; color: #fff; border-radius: 6px; padding: 2px 7px; margin-left: 6px; }
+  .tag.ok { background: #0a7d33; }
   .row.target { background: #fff7ed; }
   .empty { font-size: 22px; color: #666; margin-top: 14px; }
   .hint { font-size: 15px; color: #999; }
@@ -120,6 +121,7 @@ function row(i, small, showTag){
   const inMin = (i.in_min === undefined || i.in_min === null) ? '' : `<div class="in">za ${i.in_min} min</div>`;
   const tag = (showTag && i.target) ? '<span class="tag">na 6</span>' : '';
   const late = i.late ? '<span class="tag">po 15</span>' : '';
+  const wk = i.week_ok ? '<span class="tag ok">týden</span>' : '';
   const second = i.legs && i.legs[1];
   const extra = second
     ? `data-t2="${second.trip}" data-s1b="${second.s1}" data-s2b="${second.s2}" data-via="${i.via || ''}"`
@@ -132,7 +134,7 @@ function row(i, small, showTag){
       <div class="t">${i.dep}</div>
       ${inMin}
       <div class="line">${i.line}</div>
-      <div class="arr">${tag}${late} ${arrTxt} <span class="hint">▸</span></div>
+      <div class="arr">${tag}${late}${wk} ${arrTxt} <span class="hint">▸</span></div>
     </div>`;
 }
 
@@ -146,7 +148,12 @@ function fill(id, items, small, showTag, emptyText){
 
 function draw(d){
   document.getElementById('now').textContent = d.now;
-  document.getElementById('foot').textContent = 'aktualizováno ' + d.now + ' · klikni na spoj pro zastávky';
+  const w = d.week || {};
+  const wtxt = w.mode === 'friday'
+    ? `týden ${w.weekly} h · pá odjezd do ${w.friday_leave} (kroužek)`
+    : `týden ${w.weekly} h · příjezd ${w.arrive} → odjezd od ${w.dep}`;
+  document.getElementById('foot').textContent =
+    'aktualizováno ' + d.now + ' · ' + wtxt + ' · klikni na spoj pro zastávky';
 
   if (MODE === 'now' || MODE === 'time'){
     const atTxt = MODE === 'time' ? ' · v ' + (document.getElementById('at').value || '16:00') : '';

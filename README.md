@@ -26,6 +26,7 @@ Pro senzory v HA (bez add-onu) použij [`homeassistant/`](homeassistant/README.m
   - **PLÁN** — typický pracovní den: ráno „na 6“ a odpoledne „před 15:00“.
   - **ČAS** — zvolíte hodinu a displej ukáže, co jede od té doby; hodí se na „co kdybych jel v 16:00“.
   - Z práce se zobrazují i spoje **po 15:00** (se štítkem „po 15“) a 4 varianty **přes autobusové nádraží**.
+  - Spoje, které už splní **týdenní fond hodin**, mají zelenou značku „týden“ (nastavení v `commute.json` → `work_hours`).
 - **PWA** — jde nainstalovat na plochu PC, tabletu i telefonu, funguje offline (shell se cachuje, data vždy ze sítě).
 - **Home Assistant** — hotový balíček s REST senzory a automatizací, viz [`homeassistant/`](homeassistant/).
 
