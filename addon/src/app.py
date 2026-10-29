@@ -464,6 +464,73 @@ def _plan(day, home, work, arrive_by, leave_before, leave_after=None):
     return {'morning': morning, 'afternoon': afternoon, 'date': day.isoformat()}
 
 
+def _via(a, via, b, cur, limit=4, day=None):
+    """Spojení přes zadanou zastávku (např. z práce přes autobusové nádraží)."""
+    con = db()
+
+    def ids(name):
+        return [r['stop_id'] for r in con.execute('SELECT stop_id FROM stops WHERE name=?', (name,))]
+
+    A, V, B = ids(a), ids(via), ids(b)
+    if not (A and V and B):
+        con.close()
+        return []
+    svc = active_services(con, day)
+    if not svc:
+        con.close()
+        return []
+    lo = f'{cur // 60:02d}:{cur % 60:02d}:00'
+    ph_s = ','.join('?' * len(svc))
+
+    def legs(x, y):
+        ph_x = ','.join('?' * len(x))
+        ph_y = ','.join('?' * len(y))
+        sql = f'''
+            SELECT st1.dep d1, st2.arr a1, st1.trip_id t, st1.seq s1, st2.seq s2,
+                   r.short_name line, tr.headsign
+            FROM stop_times st1
+            JOIN stop_times st2 ON st2.trip_id = st1.trip_id AND st2.seq > st1.seq
+            JOIN trips tr ON tr.trip_id = st1.trip_id
+            JOIN routes r ON r.route_id = tr.route_id
+            WHERE st1.stop_id IN ({ph_x}) AND st2.stop_id IN ({ph_y})
+              AND tr.service_id IN ({ph_s})
+              AND st1.dep >= ? AND st1.dep <> '' AND st2.arr <> ''
+            ORDER BY st1.dep'''
+        return con.execute(sql, (*x, *y, *svc, lo)).fetchall()
+
+    first = legs(A, V)
+    second = legs(V, B)
+    out = []
+    for f in first:
+        arr1 = hm(f['a1'])
+        pick = None
+        for s in second:
+            dep2 = hm(s['d1'])
+            if s['t'] == f['t'] or s['line'] == f['line']:
+                continue
+            if 3 <= dep2 - arr1 <= 45:
+                pick = s
+                break
+        if not pick:
+            continue
+        out.append({
+            'line': f['line'], 'dep': f['d1'][:5], 'arr': pick['a1'][:5],
+            'in_min': hm(f['d1']) - cur, 'via': via, 'type': 'bus',
+            'headsign': f['headsign'] or '',
+            'trip': f['t'], 's1': f['s1'], 's2': f['s2'],
+            'legs': [
+                {'line': f['line'], 'dep': f['d1'][:5], 'arr': f['a1'][:5],
+                 'trip': f['t'], 's1': f['s1'], 's2': f['s2']},
+                {'line': pick['line'], 'dep': pick['d1'][:5], 'arr': pick['a1'][:5],
+                 'trip': pick['t'], 's1': pick['s1'], 's2': pick['s2']},
+            ],
+        })
+        if len(out) >= limit:
+            break
+    con.close()
+    return out
+
+
 @app.route('/api/display')
 def api_display():
     cfg = load_commute()
@@ -474,6 +541,16 @@ def api_display():
     alt = cfg.get('alt_home') or ''
     leave_before = cfg.get('leave_before') or None
     leave_after = cfg.get('leave_after') or None
+
+    # volitelný čas ("view pro zvolenou hodinu"): /api/display?at=16:00
+    at = request.args.get('at', '')
+    if at:
+        try:
+            hh, mm = (int(x) for x in at.split(':'))
+            if 0 <= hh <= 23 and 0 <= mm <= 59:
+                cur = hh * 60 + mm
+        except (ValueError, TypeError):
+            pass
 
     evening = cur >= 19 * 60          # po 19:00 už má smysl ukazovat zítřejší ráno
     arrive_by = cfg.get('arrive_by')
@@ -486,10 +563,32 @@ def api_display():
         for i in to_work['items']:
             i['target'] = (i is best)
 
+    # z práce: 3 spoje před 15:00 + 3 po 15:00
+    pre = _direct(work, home, cur, limit=3, max_dep=leave_before, min_dep=leave_after)
+    post = _direct(work, home, cur, limit=3, min_dep=leave_before)
+    post_tomorrow = False
+    if not post and not pre:
+        post = _direct(work, home, 0, limit=3, day=tomorrow, min_dep=leave_before)
+        for i in post:
+            i['in_min'] = None
+        post_tomorrow = bool(post)
+    for i in post:
+        i['late'] = True
+
+    # alternativa: 4 spoje přes autobusové nádraží
+    via_items = _via(work, alt, home, cur, limit=4) if alt else []
+    via_tomorrow = False
+    if not via_items and alt:
+        via_items = _via(work, alt, home, 0, limit=4, day=tomorrow)
+        for i in via_items:
+            i['in_min'] = None
+        via_tomorrow = bool(via_items)
+
     workday = _typical_workday(t.date())
 
     return jsonify({
         'now': t.strftime('%H:%M'),
+        'at': at or None,
         'home': cfg.get('home_label', 'Doma'),
         'work': cfg.get('work_label', 'Práce'),
         'arrive_by': arrive_by,
@@ -497,7 +596,9 @@ def api_display():
         'plan': _plan(workday, home, work, arrive_by, leave_before, leave_after),
         'to_work': to_work,
         'to_work_alt': _direction(alt, work, cur, tomorrow, limit=4, force_tomorrow=evening) if alt else None,
-        'from_work': _direction(work, home, cur, tomorrow, limit=6, max_dep=leave_before, min_dep=leave_after),
+        'from_work': {'from': work, 'to': home, 'items': pre + post,
+                      'tomorrow': post_tomorrow, 'split': len(pre)},
+        'from_work_via': {'via': alt, 'items': via_items, 'tomorrow': via_tomorrow} if alt else None,
     })
 
 

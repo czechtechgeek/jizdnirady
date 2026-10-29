@@ -21,6 +21,7 @@
   .mode.on { background: #111; color: #fff; }
   .mode.small { font-size: 15px; font-weight: 600; padding: 6px 10px; border-width: 2px; }
   a.mode { text-decoration: none; color: #111; display: inline-block; }
+  input.mode { font-family: inherit; color: #111; background: #fff; }
   .now { margin-left: auto; font-size: 22px; color: #555; font-variant-numeric: tabular-nums; }
   .wrap { display: flex; gap: 20px; padding: 14px 20px 10px; }
   .col { flex: 1; border: 3px solid #111; border-radius: 14px; padding: 14px 18px; min-height: 0; }
@@ -56,6 +57,8 @@
 <div class="top">
   <button class="mode on" id="m-now" onclick="setMode('now')">TEĎ</button>
   <button class="mode" id="m-plan" onclick="setMode('plan')">PLÁN</button>
+  <button class="mode" id="m-time" onclick="setMode('time')">ČAS</button>
+  <input class="mode small" id="at" type="time" value="16:00" onchange="onAtChange()">
   <button class="mode small" id="fs" onclick="toggleFs()">celá obrazovka</button>
   <a class="mode small" id="back" href="/">hledat</a>
   <div class="now" id="now"></div>
@@ -71,6 +74,8 @@
   <div class="col">
     <div class="title" id="t2">Z práce</div>
     <div id="c2"></div>
+    <div class="sub" id="viaTitle" style="display:none">přes autobusové nádraží</div>
+    <div id="c2b"></div>
   </div>
 </div>
 
@@ -91,18 +96,22 @@ let MODE = 'now', LAST = null;
 
 function setMode(m){
   MODE = m;
-  document.getElementById('view-now').style.display = m === 'now' ? 'flex' : 'none';
+  document.getElementById('view-now').style.display = (m === 'now' || m === 'time') ? 'flex' : 'none';
   document.getElementById('view-plan').style.display = m === 'plan' ? 'flex' : 'none';
   document.getElementById('m-now').classList.toggle('on', m === 'now');
   document.getElementById('m-plan').classList.toggle('on', m === 'plan');
-  if (LAST) draw(LAST);
+  document.getElementById('m-time').classList.toggle('on', m === 'time');
+  tick();
 }
+function onAtChange(){ if (MODE === 'time') tick(); }
 if (location.hash === '#plan') setMode('plan');
 
 async function tick(){
   if (document.querySelector('.detail')) return;   // nemažeme otevřený detail
+  let url = '/api/display';
+  if (MODE === 'time') url += '?at=' + encodeURIComponent(document.getElementById('at').value || '16:00');
   try {
-    LAST = await (await fetch('/api/display')).json();
+    LAST = await (await fetch(url)).json();
     draw(LAST);
   } catch(e) { document.getElementById('foot').textContent = 'spojení se serverem selhalo'; }
 }
@@ -110,14 +119,20 @@ async function tick(){
 function row(i, small, showTag){
   const inMin = (i.in_min === undefined || i.in_min === null) ? '' : `<div class="in">za ${i.in_min} min</div>`;
   const tag = (showTag && i.target) ? '<span class="tag">na 6</span>' : '';
+  const late = i.late ? '<span class="tag">po 15</span>' : '';
+  const second = i.legs && i.legs[1];
+  const extra = second
+    ? `data-t2="${second.trip}" data-s1b="${second.s1}" data-s2b="${second.s2}" data-via="${i.via || ''}"`
+    : '';
+  const arrTxt = second ? `${second.line} · ${i.arr}` : i.arr;
   return `
     <div class="row ${small ? 'small' : ''} ${i.target ? 'target' : ''}"
-         data-trip="${i.trip}" data-s1="${i.s1}" data-s2="${i.s2}"
+         data-trip="${i.trip}" data-s1="${i.s1}" data-s2="${i.s2}" ${extra}
          data-headsign="${(i.headsign || '').replace(/"/g, '&quot;')}">
       <div class="t">${i.dep}</div>
       ${inMin}
       <div class="line">${i.line}</div>
-      <div class="arr">${tag} ${i.arr} <span class="hint">▸</span></div>
+      <div class="arr">${tag}${late} ${arrTxt} <span class="hint">▸</span></div>
     </div>`;
 }
 
@@ -133,17 +148,21 @@ function draw(d){
   document.getElementById('now').textContent = d.now;
   document.getElementById('foot').textContent = 'aktualizováno ' + d.now + ' · klikni na spoj pro zastávky';
 
-  if (MODE === 'now'){
-    document.getElementById('c1').innerHTML = '';
+  if (MODE === 'now' || MODE === 'time'){
+    const atTxt = MODE === 'time' ? ' · v ' + (document.getElementById('at').value || '16:00') : '';
     document.querySelector('#view-now .col .title').textContent =
-      'Do práce' + (d.to_work.tomorrow ? ' · zítra' : '');
+      'Do práce' + (d.to_work.tomorrow ? ' · zítra' : '') + atTxt;
     fill('c1', d.to_work.items, false, true, d.to_work.tomorrow ? 'zítra nic' : 'dnes už nic');
     const alt = d.to_work_alt;
     document.getElementById('altTitle').style.display = alt ? 'block' : 'none';
     if (alt) fill('c1b', alt.items, true, false, 'nic');
-    document.getElementById('t2').textContent = 'Z práce' + (d.leave_before ? ' · do ' + d.leave_before : '') +
+
+    document.getElementById('t2').textContent = 'Z práce' + atTxt +
       (d.from_work.tomorrow ? ' · zítra' : '');
     fill('c2', d.from_work.items, false, false, 'dnes už nic');
+    const via = d.from_work_via;
+    document.getElementById('viaTitle').style.display = (via && via.items.length) ? 'block' : 'none';
+    if (via) fill('c2b', via.items, true, false, 'nic');
   } else {
     const p = d.plan || {morning: [], afternoon: []};
     document.getElementById('t3').textContent = 'Ráno do práce' + (d.arrive_by ? ' · na ' + d.arrive_by : '');
@@ -162,13 +181,23 @@ async function toggleDetail(row){
   box.textContent = 'načítám…';
   row.after(box);
   try {
-    const url = `/api/trip?trip=${encodeURIComponent(row.dataset.trip)}&s1=${row.dataset.s1}&s2=${row.dataset.s2}`;
-    const stops = await (await fetch(url)).json();
-    const head = row.dataset.headsign ? `<div class="head">směr ${row.dataset.headsign}</div>` : '';
-    box.innerHTML = head + stops.map((s, i) => `
+    const get = (t, a, b) => fetch(`/api/trip?trip=${encodeURIComponent(t)}&s1=${a}&s2=${b}`).then(r => r.json());
+    const stops = await get(row.dataset.trip, row.dataset.s1, row.dataset.s2);
+    let html = row.dataset.headsign ? `<div class="head">směr ${row.dataset.headsign}</div>` : '';
+    html += stops.map((s, i) => `
       <div class="stop ${i === 0 ? 'first' : (i === stops.length - 1 ? 'last' : 'mid')}">
         <span class="tm">${s.dep}</span><span>${s.name}</span>
       </div>`).join('');
+
+    if (row.dataset.t2) {
+      const stops2 = await get(row.dataset.t2, row.dataset.s1b, row.dataset.s2b);
+      html += `<div class="head" style="margin-top:8px">přestup v ${row.dataset.via || 'přestupní zastávce'}, pak:</div>`;
+      html += stops2.map((s, i) => `
+        <div class="stop ${i === 0 ? 'first' : (i === stops2.length - 1 ? 'last' : 'mid')}">
+          <span class="tm">${s.dep}</span><span>${s.name}</span>
+        </div>`).join('');
+    }
+    box.innerHTML = html;
   } catch(e) { box.textContent = 'detail se nepodařilo načíst'; }
 }
 

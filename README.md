@@ -21,9 +21,11 @@ Pro senzory v HA (bez add-onu) použij [`homeassistant/`](homeassistant/README.m
 - **Hledání spojení** mezi dvěma zastávkami s našeptávačem (všechny zastávky IDOL, Liberecký kraj a navazující linky).
 - **Přestupy** — pokud nejede přímý spoj, zkusí jedno přestupové spojení (min. 3 minuty na přestup, max. 45 minut čekání). Výsledky se cachují na 5 minut.
 - **Oblíbené trasy** a **historie hledání** v samostatné `user.db` — přežije přestavbu jízdních řádů.
-- **Displej** (`/display`) pro tablet nebo malý monitor: dva režimy, velké časy, klik na spoj rozbalí všechny zastávky.
+- **Displej** (`/display`) pro tablet nebo malý monitor: tři režimy, velké časy, klik na spoj rozbalí všechny zastávky.
   - **TEĎ** — co jede právě teď (včetně alternativy z jiné zastávky).
   - **PLÁN** — typický pracovní den: ráno „na 6“ a odpoledne „před 15:00“.
+  - **ČAS** — zvolíte hodinu a displej ukáže, co jede od té doby; hodí se na „co kdybych jel v 16:00“.
+  - Z práce se zobrazují i spoje **po 15:00** (se štítkem „po 15“) a 4 varianty **přes autobusové nádraží**.
 - **PWA** — jde nainstalovat na plochu PC, tabletu i telefonu, funguje offline (shell se cachuje, data vždy ze sítě).
 - **Home Assistant** — hotový balíček s REST senzory a automatizací, viz [`homeassistant/`](homeassistant/).
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 — 2026-10-29
+
+### Přidáno
+- Displej: **spojení z práce i po 15:00** — tři spoje před třetí a tři po ní (spoje po 15:00 mají štítek „po 15“).
+- Displej: **4 varianty přes autobusové nádraží** (`from_work_via`), včetně dvou úseků a detailu zastávek obou spojů.
+- Displej: nový režim **ČAS** — zvolíte hodinu a vidíte, co jede od té doby (`/api/display?at=16:00`), včetně variant přes autobusové nádraží.
+
 ## 1.0.1 — 2026-10-28
 
 ### Opraveno
